@@ -458,46 +458,35 @@ double Kinetic() { //Write Function here!
 
 // Function to calculate the potential energy of the system
 double Potential() {
-    double quot, r2, rnorm, term1, term2, Pot , aux, aux2, r28, temp1, temp2;
+    double quot, r2, term1, term2, Pot , aux, aux2,  temp1, temp2;
     int i, j, k;
     
     Pot=0.;
     for (k=0; k<3; k++) {
         //evitar calcular 2 vezes pares i j e j i
                 
-                // if (j!=i) {
-                r2=0.;
-                r28=0.;
-                for (i=0; i<N; i++) {
-                    for (j=i+1; j<N; j++) { 
-                        temp1 = r[i][k];
-                        temp2 = r[j][k];
-                        aux = temp1-temp2;
-                        r2 += aux * aux;  //r2 += (r[i][k]-r[j][k])*(r[i][k]-r[j][k]); 
-                        aux2 = temp2-temp1;
-                        r28 += aux2 * aux2;                        
-                    }
-                }
-                rnorm=sqrt(r2);
-                quot=sigma/rnorm;
-                term1 = pow(quot,12.);
-                term2 = pow(quot,6.);
-                
-                Pot += 4*epsilon*(term1 - term2);
+        // if (j!=i) {
+        r2=0.;
+        for (i=0; i<N; i++) {
+            for (j=i+1; j<N; j++) { 
+                temp1 = r[i][k];
+                temp2 = r[j][k];
+                aux = temp1-temp2;
+                r2 += aux * aux;  //r2 += (r[i][k]-r[j][k])*(r[i][k]-r[j][k]); 
+                                     
+            }
+        }
+        quot=sigma/r2;
+        term1 = pow(quot,12.);
+        term2 = pow(quot,6.);
+        
+        Pot += 4*epsilon*(term1 - term2);
 
-                rnorm=sqrt(r28);
-                quot=sigma/rnorm;
-                term1 = pow(quot,12.);
-                term2 = pow(quot,6.);
-                
-                Pot += 4*epsilon*(term1 - term2);
-                    
-                // }
-    
+        // }
+
     }
     return Pot;
 }
-
 
 
 //   Uses the derivative of the Lennard-Jones potential to calculate
@@ -505,7 +494,7 @@ double Potential() {
 //   accelleration of each atom. 
 void computeAccelerations() {
     int i, j, k;
-    double f, rSqd;
+    double f, rSqd ,temp ;
     double rij[3]; // position of i relative to j
     
     
@@ -518,12 +507,13 @@ void computeAccelerations() {
         for (j = i+1; j < N; j++) {
             // initialize r^2 to zero
             rSqd = 0;
-            
+            temp = 0;
             for (k = 0; k < 3; k++) {
                 //  component-by-componenent position of i relative to j
-                rij[k] = r[i][k] - r[j][k];
+                temp = r[i][k] - r[j][k];
+                rij[k] = temp;
                 //  sum of squares of the components
-                rSqd += rij[k] * rij[k];
+                rSqd += temp * temp;
             }
             
             //  From derivative of Lennard-Jones with sigma and epsilon set equal to 1 in natural units!
@@ -536,6 +526,41 @@ void computeAccelerations() {
         }
     }
 }
+
+// ================== chatGPT =========================
+// void computeAccelerations() {
+//     int i, j, k;
+//     double f, rSqd;
+    
+//     for (i = 0; i < N; i++) {
+//         for (k = 0; k < 3; k++) {
+//             a[i][k] = 0;
+//         }
+//     }
+
+//     for (i = 0; i < N - 1; i++) {
+//         for (j = i + 1; j < N; j++) {
+//             rSqd = 0;
+//             for (k = 0; k < 3; k++) {
+//                 double diff = r[i][k] - r[j][k];
+//                 rSqd += diff * diff;
+//             }
+
+//             if (rSqd != 0) {
+//                 double rSqdInv = 1.0 / rSqd;
+//                 double f = 48.0 * pow(rSqdInv, 3) - 24.0 * pow(rSqdInv, 2);
+
+//                 for (k = 0; k < 3; k++) {
+//                     double rij = r[i][k] - r[j][k];
+//                     a[i][k] += rij * f;
+//                     a[j][k] -= rij * f;
+//                 }
+//             }
+//         }
+//     }
+// }
+
+//======================================================
 
 // returns sum of dv/dt*m/A (aka Pressure) from elastic collisions with walls
 double VelocityVerlet(double dt, int iter, FILE *fp) {
