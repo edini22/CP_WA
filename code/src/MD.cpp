@@ -462,38 +462,39 @@ double Potential() {
     int i, j, k;
     
     Pot=0.;
-    for (i=0; i<N; i++) {
-        for (j=i+1; j<N; j++) { //evitar calcular 2 vezes pares i j e j i
-            
-            // if (j!=i) {
-            r2=0.;
-            r28=0.;
-            for (k=0; k<3; k++) {
-                temp1 = r[i][k];
-                temp2 = r[j][k];
-                aux = temp1-temp2;
-                r2 += aux * aux;  //r2 += (r[i][k]-r[j][k])*(r[i][k]-r[j][k]); 
-                aux2 = temp2-temp1;
-                r28 += aux2 * aux2;                        
-            }
-            rnorm=sqrt(r2);
-            quot=sigma/rnorm;
-            term1 = pow(quot,12.);
-            term2 = pow(quot,6.);
-            
-            Pot += 4*epsilon*(term1 - term2);
-
-            rnorm=sqrt(r28);
-            quot=sigma/rnorm;
-            term1 = pow(quot,12.);
-            term2 = pow(quot,6.);
-            
-            Pot += 4*epsilon*(term1 - term2);
+    for (k=0; k<3; k++) {
+        //evitar calcular 2 vezes pares i j e j i
                 
-            // }
-        }
-    }
+                // if (j!=i) {
+                r2=0.;
+                r28=0.;
+                for (i=0; i<N; i++) {
+                    for (j=i+1; j<N; j++) { 
+                        temp1 = r[i][k];
+                        temp2 = r[j][k];
+                        aux = temp1-temp2;
+                        r2 += aux * aux;  //r2 += (r[i][k]-r[j][k])*(r[i][k]-r[j][k]); 
+                        aux2 = temp2-temp1;
+                        r28 += aux2 * aux2;                        
+                    }
+                }
+                rnorm=sqrt(r2);
+                quot=sigma/rnorm;
+                term1 = pow(quot,12.);
+                term2 = pow(quot,6.);
+                
+                Pot += 4*epsilon*(term1 - term2);
+
+                rnorm=sqrt(r28);
+                quot=sigma/rnorm;
+                term1 = pow(quot,12.);
+                term2 = pow(quot,6.);
+                
+                Pot += 4*epsilon*(term1 - term2);
+                    
+                // }
     
+    }
     return Pot;
 }
 
