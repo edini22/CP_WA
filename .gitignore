@@ -1,5 +1,5 @@
-*.txt
-*.exe
-*.xyz
-*.out
-data
+/code/*.txt
+/code/*.exe
+/code/*.xyz
+/code/*.out
+/code/data
