@@ -452,8 +452,8 @@ double Potential() {
             }
         }
         quot = sigma / r2;
-        term1 = pow(quot, 12.);
-        term2 = pow(quot, 6.);
+        term1 = quot * quot * quot * quot * quot * quot * quot * quot * quot * quot * quot * quot; // term1 = pow(quot, 12.);
+        term2 = quot * quot * quot * quot * quot * quot; // term2 = pow(quot, 6.);
 
         Pot += 4 * epsilon * (term1 - term2);
     }
@@ -488,7 +488,8 @@ void computeAccelerations() {
             }
 
             //  From derivative of Lennard-Jones with sigma and epsilon set equal to 1 in natural units!
-            f = 24 * (2 * pow(rSqd, -7) - pow(rSqd, -4));
+            f = 24 * (2 * (1 / (rSqd * rSqd * rSqd * rSqd * rSqd * rSqd * rSqd)) - (1 / (rSqd * rSqd * rSqd * rSqd))); 
+            //f = 24 * (2 * pow(rSqd, -7) - pow(rSqd, -4)); 
             for (k = 0; k < 3; k++) {
                 //  from F = ma, where m = 1 in natural units!
                 a[i][k] += rij[k] * f;
