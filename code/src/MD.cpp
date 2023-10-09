@@ -488,7 +488,7 @@ void computeAccelerations() {
             }
 
             //  From derivative of Lennard-Jones with sigma and epsilon set equal to 1 in natural units!
-            f = 24 * (2 * (1 / (rSqd * rSqd * rSqd * rSqd * rSqd * rSqd * rSqd)) - (1 / (rSqd * rSqd * rSqd * rSqd))); 
+            f =  48 * (1 / (rSqd * rSqd * rSqd * rSqd * rSqd * rSqd * rSqd)) - 24 * (1 / (rSqd * rSqd * rSqd * rSqd)); 
             //f = 24 * (2 * pow(rSqd, -7) - pow(rSqd, -4)); 
             for (k = 0; k < 3; k++) {
                 //  from F = ma, where m = 1 in natural units!
