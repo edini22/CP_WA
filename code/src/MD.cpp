@@ -492,10 +492,10 @@ double Potential() {
         }
     }
     quot = sigma / r2;
-    term1 = quot * quot * quot * quot * quot * quot * quot * quot * quot * quot * quot * quot; // term1 = pow(quot, 12.);
+    //term1 = quot * quot * quot * quot * quot * quot * quot * quot * quot * quot * quot * quot; // term1 = pow(quot, 12.);
     term2 = quot * quot * quot * quot * quot * quot; // term2 = pow(quot, 6.);
 
-    Pot += 4 * epsilon * (term1 - term2);
+    Pot += 4 * epsilon * ((term2 * term2) - term2);
 
     r2 = 0.;
     for (i = 0; i < N; i++) {
