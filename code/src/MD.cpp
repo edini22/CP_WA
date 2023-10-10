@@ -50,6 +50,8 @@ double Tinit; // 2;
 const int MAXPART = 5001;
 //  Position
 double r[MAXPART][3];
+
+double rT[3][MAXPART];
 //  Velocity
 double v[MAXPART][3];
 //  Acceleration
@@ -370,6 +372,10 @@ void initialize() {
                     r[p][0] = (i + 0.5) * pos;
                     r[p][1] = (j + 0.5) * pos;
                     r[p][2] = (k + 0.5) * pos;
+
+                    // rT[0][p] = r[p][0];
+                    // rT[1][p] = r[p][1];
+                    // rT[2][p] = r[p][2];
                 }
                 p++;
             }
@@ -626,6 +632,7 @@ double VelocityVerlet(double dt, int iter, FILE *fp) {
     for (i = 0; i < N; i++) {
         for (j = 0; j < 3; j++) {
             r[i][j] += v[i][j] * dt + 0.5 * a[i][j] * dt * dt;
+            //rT[j][i] += r[i][j];
 
             v[i][j] += 0.5 * a[i][j] * dt;
         }
