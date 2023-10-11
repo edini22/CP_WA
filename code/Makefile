@@ -12,3 +12,8 @@ clean:
 
 run:
 	./MD.exe < inputdata.txt
+
+all:
+	rm ./MD.exe
+	$(CC) $(CFLAGS) src/MD.cpp -lm -o MD.exe
+	./MD.exe < inputdata.txt
