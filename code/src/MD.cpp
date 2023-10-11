@@ -467,69 +467,73 @@ double Kinetic() { // Write Function here!
 //     return Pot;
 // }
 
+
+//===============Secound Round Potential=================
 double Potential() {
-    double quot, r2, term1, term2, Pot, aux, aux2, temp1, temp2;
+    double quot, r2, rnorm, term1, term2, Pot, term4, term6, term12;
     int i, j, k;
-
-    Pot = 0.;
     
+    Pot=0.;
+    for (i=0; i<N; i++) {
+        for (j=0; j<N; j++) {
+            
+            if (j!=i) {
+                r2=0.;
+                for (k=0; k<3; k++) {
+                    r2 += (r[i][k]-r[j][k])*(r[i][k]-r[j][k]);
+                }
+                rnorm=sqrt(r2);
+                quot=sigma/rnorm;
+                // quot = sigma / r2;
+                term2 = quot * quot;
+                term4 = term2 * term2;
+                term6 = term4 * term2;
+                term12 = term6 * term6;
 
-    r2 = 0.;
-    for (i = 0; i < N; i++) {
-        for (j = i + 1; j < N; j++) {
-            temp1 = r[i][0];
-            temp2 = r[j][0];
-            aux = temp1 - temp2;
-            r2 += aux * aux; // r2 += (r[i][k]-r[j][k])*(r[i][k]-r[j][k]);
+                Pot += 4 * epsilon * (term12- term6);
+                
+            }
         }
     }
-    quot = sigma / r2;
-    term1 = quot * quot * quot * quot * quot * quot * quot * quot * quot * quot * quot * quot; // term1 = pow(quot, 12.);
-    term2 = quot * quot * quot * quot * quot * quot; // term2 = pow(quot, 6.);
-
-    Pot += 4 * epsilon * (term1 - term2);
-    r2 = 0.;
-    for (i = 0; i < N; i++) {
-        for (j = i + 1; j < N; j++) {
-            temp1 = r[i][1];
-            temp2 = r[j][1];
-            aux = temp1 - temp2;
-            r2 += aux * aux; // r2 += (r[i][k]-r[j][k])*(r[i][k]-r[j][k]);
-        }
-    }
-    quot = sigma / r2;
-    //term1 = quot * quot * quot * quot * quot * quot * quot * quot * quot * quot * quot * quot; // term1 = pow(quot, 12.);
-    term2 = quot * quot * quot * quot * quot * quot; // term2 = pow(quot, 6.);
-
-    Pot += 4 * epsilon * ((term2 * term2) - term2);
-
-    r2 = 0.;
-    for (i = 0; i < N; i++) {
-        for (j = i + 1; j < N; j++) {
-            temp1 = r[i][2];
-            temp2 = r[j][2];
-            aux = temp1 - temp2;
-            r2 += aux * aux; // r2 += (r[i][k]-r[j][k])*(r[i][k]-r[j][k]);
-        }
-    }
-    quot = sigma / r2;
-    term1 = quot * quot * quot * quot * quot * quot * quot * quot * quot * quot * quot * quot; // term1 = pow(quot, 12.);
-    term2 = quot * quot * quot * quot * quot * quot; // term2 = pow(quot, 6.);
-
-    Pot += 4 * epsilon * (term1 - term2);
     
-
     return Pot;
 }
 
+//===============Original Potential=================
 
+// double Potential() {
+//     double quot, r2, rnorm, term1, term2, Pot;
+//     int i, j, k;
+    
+//     Pot=0.;
+//     for (i=0; i<N; i++) {
+//         for (j=0; j<N; j++) {
+            
+//             if (j!=i) {
+//                 r2=0.;
+//                 for (k=0; k<3; k++) {
+//                     r2 += (r[i][k]-r[j][k])*(r[i][k]-r[j][k]);
+//                 }
+//                 rnorm=sqrt(r2);
+//                 quot=sigma/rnorm;
+//                 term1 = pow(quot,12.);
+//                 term2 = pow(quot,6.);
+                
+//                 Pot += 4*epsilon*(term1 - term2);
+                
+//             }
+//         }
+//     }
+    
+//     return Pot;
+// }
 
 //   Uses the derivative of the Lennard-Jones potential to calculate
 //   the forces on each atom.  Then uses a = F/m to calculate the
 //   accelleration of each atom.
 void computeAccelerations() {
     int i, j, k;
-    double f, rSqd, temp;
+    double f, rSqd, temp0, temp1, temp2;
 
     for (i = 0; i < N; i++) { // set all accelerations to zero
         a[i][0] = 0;
@@ -540,18 +544,17 @@ void computeAccelerations() {
         for (j = i + 1; j < N; j++) {
             // initialize r^2 to zero
             rSqd = 0;
-            temp = 0;
             
             //  component-by-componenent position of i relative to j
-            double temp0 = r[i][0] - r[j][0];
+            temp0 = r[i][0] - r[j][0];
             //  sum of squares of the components
             rSqd += temp0 * temp0;
             
-            double temp1 = r[i][1] - r[j][1];
+            temp1 = r[i][1] - r[j][1];
             //  sum of squares of the components
             rSqd += temp1 * temp1;
             
-            double temp2 = r[i][2] - r[j][2];
+            temp2 = r[i][2] - r[j][2];
             //  sum of squares of the components
             rSqd += temp2 * temp2;
             
@@ -572,45 +575,7 @@ void computeAccelerations() {
     }
 }
 
-// ================== coPilot =========================
-// void computeAccelerations() {
-//     int i, j, k;
-//     double f, rSqd, temp;
-//     double rij[3]; // position of i relative to j
 
-//     for (i = 0; i < N; i++) { // set all accelerations to zero
-//         a[i][0] = 0;
-//         a[i][1] = 0;
-//         a[i][2] = 0;
-//     }
-//     for (i = 0; i < N - 1; i++) { // loop over all distinct pairs i,j
-//         for (j = i + 1; j < N; j++) {
-//             // initialize r^2 to zero
-//             rSqd = 0;
-//             temp = 0;
-//             // component-by-component position of i relative to j
-//             temp = r[i][0] - r[j][0];
-//             rij[0] = temp;
-//             rSqd += temp * temp;
-//             temp = r[i][1] - r[j][1];
-//             rij[1] = temp;
-//             rSqd += temp * temp;
-//             temp = r[i][2] - r[j][2];
-//             rij[2] = temp;
-//             rSqd += temp * temp;
-
-//             // From derivative of Lennard-Jones with sigma and epsilon set equal to 1 in natural units!
-//             f =  48 * (1 / (rSqd * rSqd * rSqd * rSqd * rSqd * rSqd * rSqd)) - 24 * (1 / (rSqd * rSqd * rSqd * rSqd));             
-//             //f = 24 * (2 * pow(rSqd, -7) - pow(rSqd, -4)); 
-//             a[i][0] += rij[0] * f;
-//             a[j][0] -= rij[0] * f;
-//             a[i][1] += rij[1] * f;
-//             a[j][1] -= rij[1] * f;
-//             a[i][2] += rij[2] * f;
-//             a[j][2] -= rij[2] * f;
-//         }
-//     }
-// }
 
 //======================================================
 
