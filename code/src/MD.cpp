@@ -544,20 +544,17 @@ void computeAccelerations() {
             temp = 0;
             
             //  component-by-componenent position of i relative to j
-            temp = r[i][0] - r[j][0];
-            rij[0] = temp;
+            temp0 = r[i][0] - r[j][0];
             //  sum of squares of the components
-            rSqd += temp * temp;
+            rSqd += temp0 * temp0;
             
-            temp = r[i][1] - r[j][1];
-            rij[1] = temp;
+            temp1 = r[i][1] - r[j][1];
             //  sum of squares of the components
-            rSqd += temp * temp;
+            rSqd += temp1 * temp1;
             
-            temp = r[i][2] - r[j][2];
-            rij[2] = temp;
+            temp3 = r[i][2] - r[j][2];
             //  sum of squares of the components
-            rSqd += temp * temp;
+            rSqd += temp2 * temp2;
             
 
             //  From derivative of Lennard-Jones with sigma and epsilon set equal to 1 in natural units!
@@ -565,12 +562,12 @@ void computeAccelerations() {
             //f = 24 * (2 * pow(rSqd, -7) - pow(rSqd, -4)); 
             
             //  from F = ma, where m = 1 in natural units!
-            a[i][0] += rij[0] * f;
-            a[j][0] -= rij[0] * f;
-            a[i][1] += rij[1] * f;
-            a[j][1] -= rij[1] * f;
-            a[i][2] += rij[2] * f;
-            a[j][2] -= rij[2] * f;
+            a[i][0] += temp0 * f;
+            a[j][0] -= temp0 * f;
+            a[i][1] += temp1 * f;
+            a[j][1] -= temp1 * f;
+            a[i][2] += temp2 * f;
+            a[j][2] -= temp2 * f;
             
         }
     }
