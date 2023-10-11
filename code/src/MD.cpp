@@ -543,15 +543,15 @@ void computeAccelerations() {
             temp = 0;
             
             //  component-by-componenent position of i relative to j
-            temp0 = r[i][0] - r[j][0];
+            double temp0 = r[i][0] - r[j][0];
             //  sum of squares of the components
             rSqd += temp0 * temp0;
             
-            temp1 = r[i][1] - r[j][1];
+            double temp1 = r[i][1] - r[j][1];
             //  sum of squares of the components
             rSqd += temp1 * temp1;
             
-            temp3 = r[i][2] - r[j][2];
+            double temp2 = r[i][2] - r[j][2];
             //  sum of squares of the components
             rSqd += temp2 * temp2;
             
