@@ -530,7 +530,6 @@ double Potential() {
 void computeAccelerations() {
     int i, j, k;
     double f, rSqd, temp;
-    double rij[3]; // position of i relative to j
 
     for (i = 0; i < N; i++) { // set all accelerations to zero
         a[i][0] = 0;
