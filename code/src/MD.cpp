@@ -494,7 +494,7 @@ double Kinetic()
 //===============Secound Round Potential=================
 double Potential()
 {
-    double quot, r2, rnorm, term1, term2, Pot, term4, term6, term12, aux, r0i, r1i, r2i;
+    double quot, r2, rnorm, Pot, term3, term6, term12, aux, r0i, r1i, r2i;
     int i, j, k;
     double var = 4 * epsilon;
     Pot = 0.;
@@ -509,23 +509,23 @@ double Potential()
 
             if (j != i)
             {
-
+                r2 = 0.;
                 aux = r0i - r[j][0];
                 r2 += aux * aux;
-                aux = r0i - r[j][1];
+                aux = r1i - r[j][1];
                 r2 += aux * aux;
-                aux = r0i - r[j][2];
+                aux = r2i - r[j][2];
                 r2 += aux * aux;
 
                 rnorm = sqrt(r2);
                 quot = sigma / rnorm;
                 // quot = sigma / r2;
-                term2 = quot * quot * quot;
-                term4 = term2 * term2;
-                term6 = term4 * term4;
+                term3 = quot * quot * quot;
+                term6 = term3 * term3;
+                term12 = term6 * term6;
 
 
-                Pot += var * (term6 - term4);
+                Pot += var * (term12 - term6);
             }
         }
     }
