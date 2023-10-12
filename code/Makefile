@@ -1,6 +1,6 @@
 CC = gcc
 SRC = src/
-CFLAGS = -pg -g -fno-omit-frame-pointer -O2
+CFLAGS = -pg -g -fno-omit-frame-pointer -O2 -ftree-vectorize -msse4
 
 .DEFAULT_GOAL = MD.exe
 
@@ -16,4 +16,5 @@ run:
 all:
 	rm ./MD.exe
 	$(CC) $(CFLAGS) src/MD.cpp -lm -o MD.exe
+	#srun --partition=cpar perf stat -e cycles,instructions ./MD.exe < inputdata.txt 
 	./MD.exe < inputdata.txt

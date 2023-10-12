@@ -494,9 +494,9 @@ double Kinetic()
 //===============Secound Round Potential=================
 double Potential()
 {
-    double quot, r2, rnorm, Pot, term3, term6, term12, aux, r0i, r1i, r2i;
+    double quot, r2, rnorm, Pot, term3, term6, term12, aux, r0i, r1i, r2i,term1,term2;
     int i, j, k;
-    double var = 4 * epsilon;
+    double var = 8 * epsilon; //(2 * (4 * epsilon));
     Pot = 0.;
 
     for (i = 0; i < N; i++)
@@ -504,32 +504,39 @@ double Potential()
         r0i = r[i][0];
         r1i = r[i][1];
         r2i = r[i][2];
-        for (j = 0; j < N; j++)
-        {
-
-            if (j != i)
-            {
+        for (j = i + 1; j < N; j++)
+        { 
+            //i - j pair
+            //j - i pair
+            // if (j != i)
+            // {
                 r2 = 0.;
+                
                 aux = r0i - r[j][0];
                 r2 += aux * aux;
+
                 aux = r1i - r[j][1];
                 r2 += aux * aux;
+
                 aux = r2i - r[j][2];
                 r2 += aux * aux;
 
+
                 rnorm = sqrt(r2);
+                //quot = (sigma * rnorm) / r2;      
                 quot = sigma / rnorm;
-                // quot = sigma / r2;
+
                 term3 = quot * quot * quot;
                 term6 = term3 * term3;
                 term12 = term6 * term6;
 
+                Pot += term12 - term6;
 
-                Pot += var * (term12 - term6);
-            }
+            // }
         }
     }
 
+    Pot = Pot * var;
     return Pot;
 }
 
@@ -631,6 +638,7 @@ double VelocityVerlet(double dt, int iter, FILE *fp)
     int i, j, k;
 
     double psum = 0.;
+    double aux;
 
     //  Compute accelerations from forces at current position
     // this call was removed (commented) for predagogical reasons
@@ -639,13 +647,23 @@ double VelocityVerlet(double dt, int iter, FILE *fp)
     // printf("  Updated Positions!\n");
     for (i = 0; i < N; i++)
     {
-        for (j = 0; j < 3; j++)
-        {
-            r[i][j] += v[i][j] * dt + 0.5 * a[i][j] * dt * dt;
-            // rT[j][i] += r[i][j];
+        // for (j = 0; j < 3; j++)
+        // {
+        aux = 0.5 * a[i][0] * dt ;
+        r[i][0] += v[i][0] * dt + aux * dt;
+        // rT[j][i] += r[i][j];
+        v[i][0] += aux;
 
-            v[i][j] += 0.5 * a[i][j] * dt;
-        }
+        aux = 0.5 * a[i][1] * dt ;
+        r[i][1] += v[i][1] * dt + aux * dt;
+        // rT[j][i] += r[i][j];
+        v[i][1] += aux;
+
+        aux = 0.5 * a[i][2] * dt ;
+        r[i][2] += v[i][2] * dt + aux * dt;
+        // rT[j][i] += r[i][j];
+        v[i][2] += aux;
+        // }
         // printf("  %i  %6.4e   %6.4e   %6.4e\n",i,r[i][0],r[i][1],r[i][2]);
     }
     //  Update accellerations from updated positions
