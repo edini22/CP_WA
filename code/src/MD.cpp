@@ -639,7 +639,7 @@ void computeAccelerations()
 }
 
 
-double computeAccelerationsPotential() {
+void computeAccelerationsPotential() {
 
     int i, j, k;
     double f, rSqd, temp0, temp1, temp2, ri0, ri1, ri2, aux0,aux1,aux2,rSqdInv,rSqd2,rSqd4,rSqd7, quot, rnorm, Pot, term3, term6, term12;
@@ -677,30 +677,30 @@ double computeAccelerationsPotential() {
             //  sum of squares of the components
             rSqd += temp2 * temp2;
 
-            if (i != N - 1) {
-                rSqdInv = 1.0/rSqd;
-                rSqd2 = rSqdInv*rSqdInv;
-                rSqd4 = rSqd2*rSqd2;
-                rSqd7 =  rSqd4*rSqd2*rSqdInv;
 
-                f = 24 * (2 * rSqd7 - rSqd4);
-                //  From derivative of Lennard-Jones with sigma and epsilon set equal to 1 in natural units!
-                // f = 48 * (1 / (rSqd * rSqd * rSqd * rSqd * rSqd * rSqd * rSqd)) - 24 * (1 / (rSqd * rSqd * rSqd * rSqd));
-                // f = 24 * (2 * pow(rSqd, -7) - pow(rSqd, -4));
+            rSqdInv = 1.0/rSqd;
+            rSqd2 = rSqdInv*rSqdInv;
+            rSqd4 = rSqd2*rSqd2;
+            rSqd7 =  rSqd4*rSqd2*rSqdInv;
 
-                //  from F = ma, where m = 1 in natural units!
-                aux0 = temp0 * f;
-                aux1 = temp1 * f;
-                aux2 = temp2 * f;
-                
-                a[i][0] += aux0;
-                a[i][1] += aux1;
-                a[i][2] += aux2;
+            f = 24 * (2 * rSqd7 - rSqd4);
+            //  From derivative of Lennard-Jones with sigma and epsilon set equal to 1 in natural units!
+            // f = 48 * (1 / (rSqd * rSqd * rSqd * rSqd * rSqd * rSqd * rSqd)) - 24 * (1 / (rSqd * rSqd * rSqd * rSqd));
+            // f = 24 * (2 * pow(rSqd, -7) - pow(rSqd, -4));
 
-                a[j][0] -= aux0;
-                a[j][1] -= aux1;
-                a[j][2] -= aux2;
-            }
+            //  from F = ma, where m = 1 in natural units!
+            aux0 = temp0 * f;
+            aux1 = temp1 * f;
+            aux2 = temp2 * f;
+            
+            a[i][0] += aux0;
+            a[i][1] += aux1;
+            a[i][2] += aux2;
+
+            a[j][0] -= aux0;
+            a[j][1] -= aux1;
+            a[j][2] -= aux2;
+            
             
             rnorm = sqrt(rSqd);
             //quot = (sigma * rnorm) / r2;      
@@ -715,9 +715,7 @@ double computeAccelerationsPotential() {
         }
     }
 
-    Pot = Pot * var;
-    return Pot;
-
+    PE = Pot * var;
 }
 
 
@@ -801,7 +799,7 @@ double VelocityVerlet(double dt, int iter, FILE *fp)
     }
     //  Update accellerations from updated positions
     // computeAccelerations();
-    PE = computeAccelerationsPotential();
+    computeAccelerationsPotential();
     
     //  Update velocity with updated acceleration
     for (i = 0; i < N; i++)
@@ -873,32 +871,33 @@ void initializeVelocities()
 
     int i;
 
-    for (i = 0; i < N; i++)
-    {
-
-        // for (j = 0; j < 3; j++)
-        // {
-            //  Pull a number from a Gaussian Distribution
-            v[i][0] = gaussdist();
-            v[i][1] = gaussdist();
-            v[i][2] = gaussdist();
-        // }
-    }
-
     // Vcm = sum_i^N  m*v_i/  sum_i^N  M
     // Compute center-of-mas velocity according to the formula above
     double vCM[3] = {0, 0, 0};
 
     for (i = 0; i < N; i++)
     {
-        // for (j = 0; j < 3; j++)
-        // {
+        v[i][0] = gaussdist();
+        v[i][1] = gaussdist();
+        v[i][2] = gaussdist();
+        vCM[0] += m * v[i][0];
+        vCM[1] += m * v[i][1];
+        vCM[2] += m * v[i][2];
 
-            vCM[0] += m * v[i][0];
-            vCM[1] += m * v[i][1];
-            vCM[2] += m * v[i][2];
-        // }
     }
+
+
+
+    // for (i = 0; i < N; i++)
+    // {
+    //     // for (j = 0; j < 3; j++)
+    //     // {
+    //         vCM[0] += m * v[i][0];
+    //         vCM[1] += m * v[i][1];
+    //         vCM[2] += m * v[i][2];
+            
+    //     // }
+    // }
 
     for (i = 0; i < 3; i++)
         vCM[i] /= N * m;
@@ -907,31 +906,35 @@ void initializeVelocities()
     //  velocity of each particle... effectively set the
     //  center of mass velocity to zero so that the system does
     //  not drift in space!
-    for (i = 0; i < N; i++)
-    {
-        // for (j = 0; j < 3; j++)
-        // {
-
-            v[i][0] -= vCM[0];
-            v[i][1] -= vCM[1];
-            v[i][2] -= vCM[2];
-        // }
-    }
-
     //  Now we want to scale the average velocity of the system
     //  by a factor which is consistent with our initial temperature, Tinit
     double vSqdSum, lambda;
     vSqdSum = 0.;
     for (i = 0; i < N; i++)
     {
-        // for (j = 0; j < 3; j++)
-        // {
+        v[i][0] -= vCM[0];
+        v[i][1] -= vCM[1];
+        v[i][2] -= vCM[2];
+        vSqdSum += v[i][0] * v[i][0];
+        vSqdSum += v[i][1] * v[i][1];
+        vSqdSum += v[i][2] * v[i][2];
 
-            vSqdSum += v[i][0] * v[i][0];
-            vSqdSum += v[i][1] * v[i][1];
-            vSqdSum += v[i][2] * v[i][2];
-        // }
     }
+
+    // //  Now we want to scale the average velocity of the system
+    // //  by a factor which is consistent with our initial temperature, Tinit
+    // double vSqdSum, lambda;
+    // vSqdSum = 0.;
+    // for (i = 0; i < N; i++)
+    // {
+    //     // for (j = 0; j < 3; j++)
+    //     // {
+
+    //         vSqdSum += v[i][0] * v[i][0];
+    //         vSqdSum += v[i][1] * v[i][1];
+    //         vSqdSum += v[i][2] * v[i][2];
+    //     // }
+    // }
 
     lambda = sqrt(3 * (N - 1) * Tinit / vSqdSum);
 
