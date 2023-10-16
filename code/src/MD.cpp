@@ -82,6 +82,8 @@ double MeanSquaredVelocity();
 //  Compute total kinetic energy from particle mass and velocities
 double Kinetic();
 
+double PE;
+
 int main()
 {
 
@@ -89,7 +91,7 @@ int main()
     int i;
     double dt, Vol, Temp, Press, Pavg, Tavg, rho;
     double VolFac, TempFac, PressFac, timefac;
-    double KE, PE, mvs, gc, Z;
+    double KE, /*PE,*/ mvs, gc, Z;
     char trash[10000], prefix[1000], tfn[1000], ofn[1000], afn[1000];
     FILE *infp, *tfp, *ofp, *afp;
 
@@ -320,8 +322,9 @@ int main()
         //  We would also like to use the IGL to try to see if we can extract the gas constant
         mvs = MeanSquaredVelocity();
         KE = Kinetic();
-        PE = Potential();
-
+        //PE = Potential();
+        //printf("---> %f\n", PE);
+        
         // Temperature from Kinetic Theory
         Temp = m * mvs / (3 * kB) * TempFac;
 
@@ -629,13 +632,93 @@ void computeAccelerations()
             a[j][1] -= aux1;
             a[j][2] -= aux2;
             
-            
         }
     }
+
+    
 }
 
 
+double computeAccelerationsPotential() {
 
+    int i, j, k;
+    double f, rSqd, temp0, temp1, temp2, ri0, ri1, ri2, aux0,aux1,aux2,rSqdInv,rSqd2,rSqd4,rSqd7, quot, rnorm, Pot, term3, term6, term12;
+
+    double var = 8 * epsilon; //(2 * (4 * epsilon));
+    Pot = 0.;
+
+
+    for (i = 0; i < N; i++)
+    { // set all accelerations to zero
+        a[i][0] = 0;
+        a[i][1] = 0;
+        a[i][2] = 0;
+    }
+    for (i = 0; i < N; i++)
+    { // loop over all distinct pairs i,j
+        ri0 = r[i][0];
+        ri1 = r[i][1];
+        ri2 = r[i][2];
+        for (j = i + 1; j < N; j++)
+        {
+            // initialize r^2 to zero
+            rSqd = 0;
+
+            //  component-by-componenent position of i relative to j
+            temp0 = ri0 - r[j][0];
+            //  sum of squares of the components
+            rSqd += temp0 * temp0;
+
+            temp1 = ri1 - r[j][1];
+            //  sum of squares of the components
+            rSqd += temp1 * temp1;
+
+            temp2 = ri2 - r[j][2];
+            //  sum of squares of the components
+            rSqd += temp2 * temp2;
+
+            if (i != N - 1) {
+                rSqdInv = 1.0/rSqd;
+                rSqd2 = rSqdInv*rSqdInv;
+                rSqd4 = rSqd2*rSqd2;
+                rSqd7 =  rSqd4*rSqd2*rSqdInv;
+
+                f = 24 * (2 * rSqd7 - rSqd4);
+                //  From derivative of Lennard-Jones with sigma and epsilon set equal to 1 in natural units!
+                // f = 48 * (1 / (rSqd * rSqd * rSqd * rSqd * rSqd * rSqd * rSqd)) - 24 * (1 / (rSqd * rSqd * rSqd * rSqd));
+                // f = 24 * (2 * pow(rSqd, -7) - pow(rSqd, -4));
+
+                //  from F = ma, where m = 1 in natural units!
+                aux0 = temp0 * f;
+                aux1 = temp1 * f;
+                aux2 = temp2 * f;
+                
+                a[i][0] += aux0;
+                a[i][1] += aux1;
+                a[i][2] += aux2;
+
+                a[j][0] -= aux0;
+                a[j][1] -= aux1;
+                a[j][2] -= aux2;
+            }
+            
+            rnorm = sqrt(rSqd);
+            //quot = (sigma * rnorm) / r2;      
+            quot = sigma / rnorm;
+
+            term3 = quot * quot * quot;
+            term6 = term3 * term3;
+            term12 = term6 * term6;
+
+            Pot += term12 - term6;
+
+        }
+    }
+
+    Pot = Pot * var;
+    return Pot;
+
+}
 
 
 //================Original Compute Accelerations=================
@@ -717,7 +800,9 @@ double VelocityVerlet(double dt, int iter, FILE *fp)
         // printf("  %i  %6.4e   %6.4e   %6.4e\n",i,r[i][0],r[i][1],r[i][2]);
     }
     //  Update accellerations from updated positions
-    computeAccelerations();
+    // computeAccelerations();
+    PE = computeAccelerationsPotential();
+    
     //  Update velocity with updated acceleration
     for (i = 0; i < N; i++)
     {
