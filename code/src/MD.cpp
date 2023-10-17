@@ -76,7 +76,7 @@ double gaussdist();
 //  Initialize velocities according to user-supplied initial Temperature (Tinit)
 void initializeVelocities();
 //  Compute total potential energy from particle coordinates
-double Potential();
+// double Potential();
 //  Compute mean squared velocity from particle velocities
 double MeanSquaredVelocity();
 //  Compute total kinetic energy from particle mass and velocities
@@ -495,53 +495,53 @@ double Kinetic()
 // }
 
 //===============Secound Round Potential=================
-double Potential()
-{
-    double quot, r2, rnorm, Pot, term3, term6, term12, aux, r0i, r1i, r2i,term1,term2;
-    int i, j, k;
-    double var = 8 * epsilon; //(2 * (4 * epsilon));
-    Pot = 0.;
+// double Potential()
+// {
+//     double quot, r2, rnorm, Pot, term3, term6, term12, aux, r0i, r1i, r2i,term1,term2;
+//     int i, j, k;
+//     double var = 8 * epsilon; //(2 * (4 * epsilon));
+//     Pot = 0.;
 
-    for (i = 0; i < N; i++)
-    {
-        r0i = r[i][0];
-        r1i = r[i][1];
-        r2i = r[i][2];
-        for (j = i + 1; j < N; j++)
-        { 
-            //i - j pair
-            //j - i pair
-            // if (j != i)
-            // {
-                r2 = 0.;
+//     for (i = 0; i < N; i++)
+//     {
+//         r0i = r[i][0];
+//         r1i = r[i][1];
+//         r2i = r[i][2];
+//         for (j = i + 1; j < N; j++)
+//         { 
+//             //i - j pair
+//             //j - i pair
+//             // if (j != i)
+//             // {
+//                 r2 = 0.;
                 
-                aux = r0i - r[j][0];
-                r2 += aux * aux;
+//                 aux = r0i - r[j][0];
+//                 r2 += aux * aux;
 
-                aux = r1i - r[j][1];
-                r2 += aux * aux;
+//                 aux = r1i - r[j][1];
+//                 r2 += aux * aux;
 
-                aux = r2i - r[j][2];
-                r2 += aux * aux;
+//                 aux = r2i - r[j][2];
+//                 r2 += aux * aux;
 
 
-                rnorm = sqrt(r2);
-                //quot = (sigma * rnorm) / r2;      
-                quot = sigma / rnorm;
+//                 rnorm = sqrt(r2);
+//                 //quot = (sigma * rnorm) / r2;      
+//                 quot = sigma / rnorm;
 
-                term3 = quot * quot * quot;
-                term6 = term3 * term3;
-                term12 = term6 * term6;
+//                 term3 = quot * quot * quot;
+//                 term6 = term3 * term3;
+//                 term12 = term6 * term6;
 
-                Pot += term12 - term6;
+//                 Pot += term12 - term6;
 
-            // }
-        }
-    }
+//             // }
+//         }
+//     }
 
-    Pot = Pot * var;
-    return Pot;
-}
+//     Pot = Pot * var;
+//     return Pot;
+// }
 
 //===============Original Potential=================
 
@@ -702,15 +702,16 @@ void computeAccelerationsPotential() {
             a[j][2] -= aux2;
             
             
-            rnorm = sqrt(rSqd);
+            // rnorm = sqrt(rSqd);
             //quot = (sigma * rnorm) / r2;      
-            quot = sigma / rnorm;
+            // quot = sigma / rnorm;
+            quot = sigma / rSqd;
 
             term3 = quot * quot * quot;
             term6 = term3 * term3;
-            term12 = term6 * term6;
+            //term12 = term6 * term6;
 
-            Pot += term12 - term6;
+            Pot += term6 - term3;
 
         }
     }
