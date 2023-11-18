@@ -1,5 +1,11 @@
-/code/*.txt
-/code/*.exe
-/code/*.xyz
-/code/*.out
-/code/data
+/code_wa1/*.txt
+/code_wa1/*.exe
+/code_wa1/*.xyz
+/code_wa1/*.out
+/code_wa1/data
+
+/code_wa2/*.txt
+/code_wa2/*.exe
+/code_wa2/*.xyz
+/code_wa2/*.out
+/code_wa2/data
