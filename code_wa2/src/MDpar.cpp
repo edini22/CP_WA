@@ -27,6 +27,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <omp.h>
 
 // Number of particles
 int N;
@@ -195,8 +196,6 @@ int main()
     printf("  NUMBER DENSITY OF LIQUID ARGON AT 1 ATM AND 87 K IS ABOUT 35000 moles/m^3\n");
 
     scanf("%lf", &rho);
-
-    //FIXME: n tenho certeza se o particulas = atomos
 
     N = 5000;
     Vol = N / (rho * NA);
