@@ -268,6 +268,7 @@ int main()
     int tenp = floor(NumTime / 10);
     fprintf(ofp, "  time (s)              T(t) (K)              P(t) (Pa)           Kinetic En. (n.u.)     Potential En. (n.u.) Total En. (n.u.)\n");
     printf("  PERCENTAGE OF CALCULATION COMPLETE:\n  [");
+    // 
     for (i = 0; i < NumTime + 1; i++)
     {
 
@@ -492,17 +493,25 @@ void computeAccelerationsPotential() {
     double var = 8 * epsilon; //(2 * (4 * epsilon));
     Pot = 0.;
 
+    #pragma omp parallel for private(i)
     for (i = 0; i < N; i++)
     { 
         a[i][0] = 0;
         a[i][1] = 0;
         a[i][2] = 0;
     }
+
+    #pragma omp parallel reduction(+:Pot, a[:N][:3])
+    #pragma omp for schedule(dynamic)
     for (i = 0; i < N-1; i++)
     { 
+        //int id = omp_get_thread_num();
+        //printf("T%d:i%d ", id, i);
         ri0 = r[i][0];
         ri1 = r[i][1];
         ri2 = r[i][2];
+        
+        //#pragma omp parallel for private(j, rSqd, temp0, temp1, temp2, rSqdInv, rSqd2, rSqd3, rSqd4, rSqd6, rSqd7, f, aux0, aux1, aux2) // Paralelizar o loop interno
         for (j = i + 1; j < N; j++)
         {
             rSqd = 0;
@@ -513,7 +522,7 @@ void computeAccelerationsPotential() {
             temp1 = ri1 - r[j][1];
             rSqd += temp1 * temp1;
 
-            temp2 = ri2 - r[j][2];
+            temp2 = ri2 - r[j][2]; 
             rSqd += temp2 * temp2;
 
             rSqdInv = 1.0/rSqd; 
@@ -544,6 +553,80 @@ void computeAccelerationsPotential() {
 
     PE = Pot * var;
 }
+
+// ******************* CHATGPT ********************* DATA RACE
+// void computeAccelerationsPotential() {
+//     int i, j;
+//     double f, rSqd, temp0, temp1, temp2, ri0, ri1, ri2, aux0, aux1, aux2, rSqdInv, rSqd2, rSqd3, rSqd4, rSqd6, rSqd7, quot, rnorm, Pot;
+
+//     double var = 8 * epsilon; //(2 * (4 * epsilon));
+//     Pot = 0.;
+
+//     // Initialize private copies of variables
+//     //double a_private[N][3];
+//     #pragma omp parallel for private(i)
+//     for (i = 0; i < N; i++) {
+//         a_private[i][0] = 0;
+//         a_private[i][1] = 0;
+//         a_private[i][2] = 0;
+//     }
+
+//     #pragma omp parallel for private(i, j, ri0, ri1, ri2, rSqd, temp0, temp1, temp2, rSqdInv, rSqd2, rSqd3, rSqd4, rSqd6, rSqd7, f, aux0, aux1, aux2) reduction(+:Pot)
+//     for (i = 0; i < N - 1; i++) {
+//         ri0 = r[i][0];
+//         ri1 = r[i][1];
+//         ri2 = r[i][2];
+
+//         for (j = i + 1; j < N; j++) {
+//             rSqd = 0;
+
+//             temp0 = ri0 - r[j][0];
+//             rSqd += temp0 * temp0;
+
+//             temp1 = ri1 - r[j][1];
+//             rSqd += temp1 * temp1;
+
+//             temp2 = ri2 - r[j][2];
+//             rSqd += temp2 * temp2;
+
+//             rSqdInv = 1.0 / rSqd;
+//             rSqd2 = rSqdInv * rSqdInv;
+//             rSqd3 = rSqd2 * rSqdInv;
+//             rSqd4 = rSqd2 * rSqd2;
+//             rSqd6 = rSqd3 * rSqd3;
+//             rSqd7 = rSqd6 * rSqdInv;
+
+//             f = 24 * (2 * rSqd7 - rSqd4);
+
+//             aux0 = temp0 * f;
+//             aux1 = temp1 * f;
+//             aux2 = temp2 * f;
+
+//             a_private[i][0] += aux0;
+//             a_private[i][1] += aux1;
+//             a_private[i][2] += aux2;
+
+//             a_private[j][0] -= aux0;
+//             a_private[j][1] -= aux1;
+//             a_private[j][2] -= aux2;
+
+//             Pot += rSqd6 - rSqd3;
+//         }
+//     }
+
+//     // Update the shared array 'a' using a critical section
+//     #pragma omp parallel for private(i)
+//     for (i = 0; i < N; i++) {
+//         #pragma omp critical
+//         {
+//             a[i][0] += a_private[i][0];
+//             a[i][1] += a_private[i][1];
+//             a[i][2] += a_private[i][2];
+//         }
+//     }
+
+//     PE = Pot * var;
+// }
 
 double VelocityVerlet(double dt, int iter, FILE *fp)
 {
