@@ -1,5 +1,5 @@
 /*
-MD.c - a simple molecular dynamics program for simulating real gas properties of Lennard-Jones particles.
+ MD.c - a simple molecular dynamics program for simulating real gas properties of Lennard-Jones particles.
 
  Copyright (C) 2016  Jonathan J. Foley IV, Chelsea Sweet, Oyewumi Akinfenwa
 
@@ -27,7 +27,6 @@ MD.c - a simple molecular dynamics program for simulating real gas properties of
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <omp.h>
 
 // Number of particles
 int N;
@@ -197,6 +196,8 @@ int main()
 
     scanf("%lf", &rho);
 
+    //FIXME: n tenho certeza se o particulas = atomos
+
     N = 5000;
     Vol = N / (rho * NA);
 
@@ -268,7 +269,6 @@ int main()
     int tenp = floor(NumTime / 10);
     fprintf(ofp, "  time (s)              T(t) (K)              P(t) (Pa)           Kinetic En. (n.u.)     Potential En. (n.u.) Total En. (n.u.)\n");
     printf("  PERCENTAGE OF CALCULATION COMPLETE:\n  [");
-    // 
     for (i = 0; i < NumTime + 1; i++)
     {
 
@@ -484,85 +484,67 @@ void computeAccelerations()
     } 
 }
 
-
+//computeAccelerations() and Potential()
 void computeAccelerationsPotential() {
-    double var = 8 * epsilon;
-    double Pot = 0.0;
-    for (int i = 0; i < N; i++)
+
+    int i, j, k;
+    double f, rSqd, temp0, temp1, temp2, ri0, ri1, ri2, aux0, aux1, aux2, rSqdInv, rSqd2, rSqd3, rSqd4,rSqd6,rSqd7, quot, rnorm, Pot;
+
+    double var = 8 * epsilon; //(2 * (4 * epsilon));
+    Pot = 0.;
+
+    for (i = 0; i < N; i++)
     { 
-        a[i][0] = 0.0;
-        a[i][1] = 0.0;
-        a[i][2] = 0.0;
+        a[i][0] = 0;
+        a[i][1] = 0;
+        a[i][2] = 0;
     }
-
-    
-    #pragma omp parallel
-    {
-        int num_threads = omp_get_num_threads();
-        int id = omp_get_thread_num();
-
-        printf("num_threads=%d id=%d\n", num_threads, id);
-
-        // Cada thread tem sua própria cópia privada da matriz 'a'
-        double private_a[N][3];
-        for (int i = 0; i < N; i++) {
-            private_a[i][0] = 0.0;
-            private_a[i][1] = 0.0;
-            private_a[i][2] = 0.0;
-        }
-
-        #pragma omp for schedule(dynamic) reduction(+:Pot)
-        for (int i = 0; i < N - 1; i++) {
-            double ri0 = r[i][0];
-            double ri1 = r[i][1];
-            double ri2 = r[i][2];
-
-            for (int j = i + 1; j < N; j++) {
-                double temp0 = ri0 - r[j][0];
-                double temp1 = ri1 - r[j][1];
-                double temp2 = ri2 - r[j][2];
-
-                double rSqd = temp0 * temp0 + temp1 * temp1 + temp2 * temp2;
-                double rSqdInv = 1.0 / rSqd;
-                double rSqd2 = rSqdInv * rSqdInv;
-                double rSqd3 = rSqd2 * rSqdInv;
-                double rSqd4 = rSqd2 * rSqd2;
-                double rSqd6 = rSqd3 * rSqd3;
-                double rSqd7 = rSqd6 * rSqdInv;
-
-                double f = 24 * (2 * rSqd7 - rSqd4);
-
-                double aux0 = temp0 * f;
-                double aux1 = temp1 * f;
-                double aux2 = temp2 * f;
-
-                private_a[i][0] += aux0;
-                private_a[i][1] += aux1;
-                private_a[i][2] += aux2;
-
-                private_a[j][0] -= aux0;
-                private_a[j][1] -= aux1;
-                private_a[j][2] -= aux2;
-
-                Pot += rSqd6 - rSqd3;
-            }
-        }
-
-        // Atualizar a matriz 'a' fora da região paralela
-        #pragma omp critical
+    for (i = 0; i < N-1; i++)
+    { 
+        ri0 = r[i][0];
+        ri1 = r[i][1];
+        ri2 = r[i][2];
+        for (j = i + 1; j < N; j++)
         {
-            for (int i = 0; i < N; i++) {
-                a[i][0] += private_a[i][0];
-                a[i][1] += private_a[i][1];
-                a[i][2] += private_a[i][2];
-            }
+            rSqd = 0;
+
+            temp0 = ri0 - r[j][0];
+            rSqd += temp0 * temp0;
+
+            temp1 = ri1 - r[j][1];
+            rSqd += temp1 * temp1;
+
+            temp2 = ri2 - r[j][2];
+            rSqd += temp2 * temp2;
+
+            rSqdInv = 1.0/rSqd; 
+            rSqd2 = rSqdInv*rSqdInv;
+            rSqd3 = rSqd2*rSqdInv;
+            rSqd4 = rSqd2*rSqd2;
+            rSqd6 = rSqd3*rSqd3;
+            rSqd7 =  rSqd6*rSqdInv;
+
+            f = 24 * (2 * rSqd7 - rSqd4);
+
+            aux0 = temp0 * f;
+            aux1 = temp1 * f;
+            aux2 = temp2 * f;
+            
+            a[i][0] += aux0;
+            a[i][1] += aux1;
+            a[i][2] += aux2;
+
+            a[j][0] -= aux0;
+            a[j][1] -= aux1;
+            a[j][2] -= aux2;
+            
+
+            Pot += rSqd6 - rSqd3;
         }
     }
 
     PE = Pot * var;
 }
-
-//======================================================
 
 double VelocityVerlet(double dt, int iter, FILE *fp)
 {
