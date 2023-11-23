@@ -434,11 +434,15 @@ void computeAccelerations()
     int i, j, k;
     double f, rSqd, temp0, temp1, temp2, ri0, ri1, ri2, aux0,aux1,aux2,rSqdInv,rSqd2,rSqd4,rSqd7;
 
-    for (i = 0; i < N; i++)
+    for (i = 0; i < N; i+=2)
     { 
         a[i][0] = 0;
         a[i][1] = 0;
         a[i][2] = 0;
+
+        a[i++][0] = 0;
+        a[i++][1] = 0;
+        a[i++][2] = 0;
     }
     for (i = 0; i < N - 1; i++)
     {
@@ -488,11 +492,15 @@ void computeAccelerations()
 void computeAccelerationsPotential() {
     double var = 8 * epsilon;
     double Pot = 0.0;
-    for (int i = 0; i < N; i++)
+    for (int i = 0; i < N; i+=2)
     { 
         a[i][0] = 0.0;
         a[i][1] = 0.0;
         a[i][2] = 0.0;
+
+        a[i++][0] = 0.0;
+        a[i++][1] = 0.0;
+        a[i++][2] = 0.0;
     }
 
     
@@ -501,7 +509,7 @@ void computeAccelerationsPotential() {
         int num_threads = omp_get_num_threads();
         int id = omp_get_thread_num();
 
-        printf("num_threads=%d id=%d\n", num_threads, id);
+        //printf("num_threads=%d id=%d\n", num_threads, id);
 
         // Cada thread tem sua própria cópia privada da matriz 'a'
         double private_a[N][3];
