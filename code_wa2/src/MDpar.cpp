@@ -434,15 +434,11 @@ void computeAccelerations()
     int i, j, k;
     double f, rSqd, temp0, temp1, temp2, ri0, ri1, ri2, aux0,aux1,aux2,rSqdInv,rSqd2,rSqd4,rSqd7;
 
-    for (i = 0; i < N; i+=2)
+    for (i = 0; i < N; i++)
     { 
         a[i][0] = 0;
         a[i][1] = 0;
         a[i][2] = 0;
-
-        a[i++][0] = 0;
-        a[i++][1] = 0;
-        a[i++][2] = 0;
     }
     for (i = 0; i < N - 1; i++)
     {
@@ -492,15 +488,11 @@ void computeAccelerations()
 void computeAccelerationsPotential() {
     double var = 8 * epsilon;
     double Pot = 0.0;
-    for (int i = 0; i < N; i+=2)
+    for (int i = 0; i < N; i++)
     { 
         a[i][0] = 0.0;
         a[i][1] = 0.0;
         a[i][2] = 0.0;
-
-        a[i++][0] = 0.0;
-        a[i++][1] = 0.0;
-        a[i++][2] = 0.0;
     }
 
     
