@@ -2,8 +2,7 @@ CC = gcc
 SRC = src/
 CFLAGS = -pg -g -fno-omit-frame-pointer -O2 -ftree-vectorize -msse4 -mavx
 
-# .DEFAULT_GOAL = all
-.DEFAULT_GOAL = gerpar
+.DEFAULT_GOAL = all
 
 all: MDseq.exe MDpar.exe
 
