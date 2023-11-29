@@ -498,8 +498,8 @@ void computeAccelerationsPotential() {
     
     #pragma omp parallel
     {
-        int num_threads = omp_get_num_threads();
-        int id = omp_get_thread_num();
+        // int num_threads = omp_get_num_threads();
+        // int id = omp_get_thread_num();
 
         //printf("num_threads=%d id=%d\n", num_threads, id);
 
