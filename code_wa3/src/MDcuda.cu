@@ -1,33 +1,51 @@
 /*
-MD.c - a simple molecular dynamics program for simulating real gas properties of Lennard-Jones particles.
-
+ MD.c - a simple molecular dynamics program for simulating real gas properties of Lennard-Jones particles.
+ 
  Copyright (C) 2016  Jonathan J. Foley IV, Chelsea Sweet, Oyewumi Akinfenwa
-
+ 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
  the Free Software Foundation, either version 3 of the License, or
  (at your option) any later version.
-
+ 
  This program is distributed in the hope that it will be useful,
  but WITHOUT ANY WARRANTY; without even the implied warranty of
  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  GNU General Public License for more details.
-
+ 
  You should have received a copy of the GNU General Public License
  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
+ 
  Electronic Contact:  foleyj10@wpunj.edu
  Mail Contact:   Prof. Jonathan Foley
  Department of Chemistry, William Paterson University
  300 Pompton Road
  Wayne NJ 07470
-
+ 
  */
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <omp.h>
+
+#include <cuda.h>
+#include <cstdlib>
+#include <iostream>
+#include <sys/time.h>
+#include <chrono>
+
+cudaEvent_t start, stop;
+
+#define checkCUDAError(ans) \
+    { gpuAssert((ans), __FILE__, __LINE__); }
+inline void gpuAssert(cudaError_t code, const char* file, int line, bool abort = true) {
+    if (code != cudaSuccess) {
+        fprintf(stderr, "GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+        if (abort) exit(code);
+    }
+}
+
 
 // Number of particles
 int N;
@@ -51,8 +69,6 @@ double Tinit; // 2;
 const int MAXPART = 5001;
 //  Position
 double r[MAXPART][3];
-
-double rT[3][MAXPART];
 //  Velocity
 double v[MAXPART][3];
 //  Acceleration
@@ -68,6 +84,7 @@ void initialize();
 //  update positions and velocities using Velocity Verlet algorithm
 //  print particle coordinates to file for rendering via VMD or other animation software
 //  return 'instantaneous pressure'
+// double VelocityVerlet(double dt, int iter, FILE *fp,double *d_r,double *d_a,double *d_Pot);
 double VelocityVerlet(double dt, int iter, FILE *fp);
 //  Compute Force using F = -dV/dr
 //  solve F = ma for use in Velocity Verlet
@@ -85,6 +102,9 @@ double Kinetic();
 
 double PE;
 
+//cuda
+double *d_r, *d_a, *d_PE;
+
 int main()
 {
 
@@ -93,8 +113,8 @@ int main()
     double dt, Vol, Temp, Press, Pavg, Tavg, rho;
     double VolFac, TempFac, PressFac, timefac;
     double KE, /*PE,*/ mvs, gc, Z;
-    char trash[10000], prefix[1000], tfn[1000], ofn[1000], afn[1000];
-    FILE *infp, *tfp, *ofp, *afp;
+    char prefix[1000], tfn[1000], ofn[1000], afn[1000];
+    FILE *tfp, *ofp, *afp;
 
     printf("\n  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
     printf("                  WELCOME TO WILLY P CHEM MD!\n");
@@ -265,10 +285,17 @@ int main()
     Pavg = 0;
     Tavg = 0;
 
+
+    // *********** CUDA ***********
+    // Allocate memory on device
+    checkCUDAError(cudaMalloc((void**)&d_r, sizeof(double) * 3 * N));
+    checkCUDAError(cudaMalloc((void**)&d_a, sizeof(double) * 3 * N));
+    checkCUDAError(cudaMalloc((void**)&d_PE, sizeof(double)));
+
+
     int tenp = floor(NumTime / 10);
     fprintf(ofp, "  time (s)              T(t) (K)              P(t) (Pa)           Kinetic En. (n.u.)     Potential En. (n.u.) Total En. (n.u.)\n");
     printf("  PERCENTAGE OF CALCULATION COMPLETE:\n  [");
-    // 
     for (i = 0; i < NumTime + 1; i++)
     {
 
@@ -298,6 +325,8 @@ int main()
         // This updates the positions and velocities using Newton's Laws
         // Also computes the Pressure as the sum of momentum changes from wall collisions / timestep
         // which is a Kinetic Theory of gasses concept of Pressure
+        
+        
         Press = VelocityVerlet(dt, i + 1, tfp);
         Press *= PressFac;
 
@@ -350,6 +379,13 @@ int main()
     fclose(tfp);
     fclose(ofp);
     fclose(afp);
+
+
+    // ******** CUDA FREE ********
+
+    checkCUDAError(cudaFree(d_r));
+    checkCUDAError(cudaFree(d_a));
+    checkCUDAError(cudaFree(d_PE));
 
     return 0;
 }
@@ -428,10 +464,9 @@ double Kinetic()
     return kin;
 }
 
-
 void computeAccelerations()
 {
-    int i, j, k;
+    int i, j;
     double f, rSqd, temp0, temp1, temp2, ri0, ri1, ri2, aux0,aux1,aux2,rSqdInv,rSqd2,rSqd4,rSqd7;
 
     for (i = 0; i < N; i++)
@@ -485,88 +520,112 @@ void computeAccelerations()
 }
 
 
-void computeAccelerationsPotential() {
-    double var = 8 * epsilon;
-    double Pot = 0.0;
-    for (int i = 0; i < N; i++)
-    { 
-        a[i][0] = 0.0;
-        a[i][1] = 0.0;
-        a[i][2] = 0.0;
+// __global__ void computeAccelerationsPotentialKernel(int N,double *r, double *a, double *d_PE) {
+//     int i = blockIdx.x * blockDim.x + threadIdx.x;
+
+//     if (i < N) {
+//         double Pot = 0.0;
+
+//         // Inicializações
+//         a[i * 3] = 0.0;
+//         a[i * 3 + 1] = 0.0;
+//         a[i * 3 + 2] = 0.0;
+
+//         for (int j = 0; j < N; j++) {
+//             if (j != i) {
+//                 double temp0 = r[i * 3] - r[j * 3];
+//                 double temp1 = r[i * 3 + 1] - r[j * 3 + 1];
+//                 double temp2 = r[i * 3 + 2] - r[j * 3 + 2];
+
+//                 double rSqd = temp0 * temp0 + temp1 * temp1 + temp2 * temp2;
+//                 double rSqdInv = 1.0 / rSqd;
+//                 double rSqd2 = rSqdInv * rSqdInv;
+//                 double rSqd3 = rSqd2 * rSqdInv;
+//                 double rSqd4 = rSqd2 * rSqd2;
+//                 double rSqd6 = rSqd3 * rSqd3;
+//                 double rSqd7 = rSqd6 * rSqdInv;
+
+//                 double f = 24 * (2 * rSqd7 - rSqd4);
+
+//                 double aux0 = temp0 * f;
+//                 double aux1 = temp1 * f;
+//                 double aux2 = temp2 * f;
+
+//                 a[i * 3] += aux0;
+//                 a[i * 3 + 1] += aux1;
+//                 a[i * 3 + 2] += aux2;
+
+//                 a[j * 3] -= aux0;
+//                 a[j * 3 + 1] -= aux1;
+//                 a[j * 3 + 2] -= aux2;
+
+//                 Pot += rSqd6 - rSqd3;
+//             }
+//         }
+//         //8 = var = 4 * 2 * epsilon
+//         atomicAdd(d_PE, Pot * 8);
+//     }
+// }
+
+__global__ void computeAccelerationsPotentialKernel(int N,double *r, double *a, double *d_PE) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j, k;
+    double f, rSqd, temp0, temp1, temp2, ri0, ri1, ri2, aux0, aux1, aux2, rSqdInv, rSqd2, rSqd3, rSqd4, rSqd6, rSqd7, quot, rnorm, Pot;
+
+    if (i < N) {
+        for (k = 0; k < 3; k++) {
+            a[i * 3 + k] = 0.0;
+        }
+
+        ri0 = r[i * 3];
+        ri1 = r[i * 3 + 1];
+        ri2 = r[i * 3 + 2];
+
+        for (j = i + 1; j < N; j++) {
+            rSqd = 0;
+
+            temp0 = ri0 - r[j * 3];
+            rSqd += temp0 * temp0;
+
+            temp1 = ri1 - r[j * 3 + 1];
+            rSqd += temp1 * temp1;
+
+            temp2 = ri2 - r[j * 3 + 2];
+            rSqd += temp2 * temp2;
+
+            rSqdInv = 1.0 / rSqd;
+            rSqd2 = rSqdInv * rSqdInv;
+            rSqd3 = rSqd2 * rSqdInv;
+            rSqd4 = rSqd2 * rSqd2;
+            rSqd6 = rSqd3 * rSqd3;
+            rSqd7 = rSqd6 * rSqdInv;
+
+            f = 24 * (2 * rSqd7 - rSqd4);
+
+            aux0 = temp0 * f;
+            aux1 = temp1 * f;
+            aux2 = temp2 * f;
+
+            atomicAdd(&a[i * 3], aux0);
+            atomicAdd(&a[i * 3 + 1], aux1);
+            atomicAdd(&a[i * 3 + 2], aux2);
+
+            atomicAdd(&a[j * 3], -aux0);
+            atomicAdd(&a[j * 3 + 1], -aux1);
+            atomicAdd(&a[j * 3 + 2], -aux2);
+
+            atomicAdd(d_PE, rSqd6 - rSqd3);
+        }
     }
+    //8 = var = 4 * 2 * epsilon
 
-    
-    #pragma omp parallel
-    {
-        // int num_threads = omp_get_num_threads();
-        // int id = omp_get_thread_num();
-
-        //printf("num_threads=%d id=%d\n", num_threads, id);
-
-        // Cada thread tem sua própria cópia privada da matriz 'a'
-        double private_a[N][3];
-        for (int i = 0; i < N; i++) {
-            private_a[i][0] = 0.0;
-            private_a[i][1] = 0.0;
-            private_a[i][2] = 0.0;
-        }
-
-        #pragma omp for schedule(dynamic) reduction(+:Pot)
-        for (int i = 0; i < N - 1; i++) {
-            double ri0 = r[i][0];
-            double ri1 = r[i][1];
-            double ri2 = r[i][2];
-
-            for (int j = i + 1; j < N; j++) {
-                double temp0 = ri0 - r[j][0];
-                double temp1 = ri1 - r[j][1];
-                double temp2 = ri2 - r[j][2];
-
-                double rSqd = temp0 * temp0 + temp1 * temp1 + temp2 * temp2;
-                double rSqdInv = 1.0 / rSqd;
-                double rSqd2 = rSqdInv * rSqdInv;
-                double rSqd3 = rSqd2 * rSqdInv;
-                double rSqd4 = rSqd2 * rSqd2;
-                double rSqd6 = rSqd3 * rSqd3;
-                double rSqd7 = rSqd6 * rSqdInv;
-
-                double f = 24 * (2 * rSqd7 - rSqd4);
-
-                double aux0 = temp0 * f;
-                double aux1 = temp1 * f;
-                double aux2 = temp2 * f;
-
-                private_a[i][0] += aux0;
-                private_a[i][1] += aux1;
-                private_a[i][2] += aux2;
-
-                private_a[j][0] -= aux0;
-                private_a[j][1] -= aux1;
-                private_a[j][2] -= aux2;
-
-                Pot += rSqd6 - rSqd3;
-            }
-        }
-
-        // Atualizar a matriz 'a' fora da região paralela
-        #pragma omp critical
-        {
-            for (int i = 0; i < N; i++) {
-                a[i][0] += private_a[i][0];
-                a[i][1] += private_a[i][1];
-                a[i][2] += private_a[i][2];
-            }
-        }
-    }
-
-    PE = Pot * var;
+    // atomicAdd(d_PE * 8, 0);
 }
 
-//======================================================
-
+// double VelocityVerlet(double dt, int iter, FILE *fp,double * d_r,double * d_a,double * d_Pot)
 double VelocityVerlet(double dt, int iter, FILE *fp)
 {
-    int i, j, k;
+    int i ;
 
     double psum = 0.;
     double aux,aux2;
@@ -588,9 +647,27 @@ double VelocityVerlet(double dt, int iter, FILE *fp)
         v[i][2] += aux;
 
     }
+
+    // ******** CUDA INITS ********
     
-    computeAccelerationsPotential();
-    
+    checkCUDAError(cudaMemcpy(d_a, a, N * 3 * sizeof(double), cudaMemcpyHostToDevice));
+    checkCUDAError(cudaMemcpy(d_r, r, N * 3 * sizeof(double), cudaMemcpyHostToDevice));
+    checkCUDAError(cudaMemcpy(d_PE, &PE, sizeof(double), cudaMemcpyHostToDevice));
+
+
+    int blockSize = 256;
+    int gridSize = (N + blockSize - 1) / blockSize;
+
+    computeAccelerationsPotentialKernel<<<gridSize, blockSize>>>(N, d_r, d_a, d_PE);
+
+    checkCUDAError(cudaDeviceSynchronize());
+
+    checkCUDAError(cudaMemcpy(a, d_a, N * 3 * sizeof(double), cudaMemcpyDeviceToHost));
+    checkCUDAError(cudaMemcpy(r, d_r, N * 3 * sizeof(double), cudaMemcpyDeviceToHost));
+    checkCUDAError(cudaMemcpy(&PE, d_PE, sizeof(double), cudaMemcpyDeviceToHost));
+    PE *= 8;
+
+
     for (i = 0; i < N; i++)
     {
         v[i][0] += 0.5 * a[i][0] * dt;
