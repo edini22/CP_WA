@@ -5,15 +5,14 @@ CXX = nvcc
 LD  = nvcc
 
 CC = gcc
-CFLAGS =  -pg -g -fno-omit-frame-pointer -O2 -ftree-vectorize -msse4 -mavx 
 
-CXXFLAGS   = -O2 -g -std=c++11 -arch=sm_70 -Wno-deprecated-gpu-targets 
-# CXXFLAGS   = -O3 -g -std=c++17 -arch=sm_70 -Wno-deprecated-gpu-targets # Armado em esperto
+# CXXFLAGS   = -O3 -g -std=c++11 -arch=sm_35 -Wno-deprecated-gpu-targets  
+CXXFLAGS   = -O3 -g -std=c++11 -arch=sm_70 -Wno-deprecated-gpu-targets  # local machine
 
 SRC_DIR = src
 BIN_DIR = bin
 BUILD_DIR = build
-SRC = $(wildcard $(SRC_DIR)/*.cu)
+SRC = $(wildcard $(SRC_DIR)/MDcuda.cu)
 OBJ = $(patsubst src/%.cu,build/%.o,$(SRC))
 BIN = $(BIN_NAME)
 

@@ -35,6 +35,10 @@
 #include <sys/time.h>
 #include <chrono>
 
+#include <cuda_runtime.h>
+
+#define BLOCK_SIZE 32 //BASE 2
+
 cudaEvent_t start, stop;
 
 #define checkCUDAError(ans) \
@@ -567,16 +571,46 @@ void computeAccelerations()
 //     }
 // }
 
-__global__ void computeAccelerationsPotentialKernel(int N,double *r, double *a, double *d_PE) {
+__device__ double atomicAddDouble(double* address, double val) {
+    unsigned long long int* address_as_ull = (unsigned long long int*)address;
+    unsigned long long int old = *address_as_ull, assumed;
+
+    do {
+        assumed = old;
+        old = atomicCAS(address_as_ull, assumed,
+                        __double_as_longlong(val + __longlong_as_double(assumed)));
+    } while (assumed != old);
+
+    return __longlong_as_double(old);
+}
+
+__global__ void computeAccelerationsPotential(int N, double *r, double *a, double *d_PE) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
-    int j, k;
-    double f, rSqd, temp0, temp1, temp2, ri0, ri1, ri2, aux0, aux1, aux2, rSqdInv, rSqd2, rSqd3, rSqd4, rSqd6, rSqd7, quot, rnorm, Pot;
+    int j;
+    double f, rSqd, temp0, temp1, temp2, ri0, ri1, ri2, aux0, aux1, aux2, rSqdInv, rSqd2, rSqd3, rSqd4, rSqd6, rSqd7;
+
+    __shared__ double partial_PE[BLOCK_SIZE];  // Tamanho do bloco, ajuste conforme necessário
+
+    // int threadId = threadIdx.x; // Índice da thread dentro do bloco
+    // int blockId = blockIdx.x;   // Índice do bloco no grid
+    // int blockD = blockDim.x;  // Número total de threads em um bloco
+    // int gridD = gridDim.x;    // Número total de blocos no grid
+
+    // int globalThreadId = threadIdx.x + blockIdx.x * blockDim.x;  // Índice global da thread
+
+    // // Imprime informações sobre as threads
+    // printf("Thread ID: %d, Block ID: %d, Block Dim: %d, Grid Dim: %d, Global Thread ID: %d\n",
+    //        threadId, blockId, blockD, gridD, globalThreadId);
+
 
     if (i < N) {
-        for (k = 0; k < 3; k++) {
-            a[i * 3 + k] = 0.0;
-        }
-
+        // Inicializações
+        a[i * 3] = 0.0;
+        a[i * 3 + 1] = 0.0;
+        a[i * 3 + 2] = 0.0;
+        partial_PE[threadIdx.x] = 0.0;
+        __syncthreads();
+        
         ri0 = r[i * 3];
         ri1 = r[i * 3 + 1];
         ri2 = r[i * 3 + 2];
@@ -613,14 +647,24 @@ __global__ void computeAccelerationsPotentialKernel(int N,double *r, double *a, 
             atomicAdd(&a[j * 3], -aux0);
             atomicAdd(&a[j * 3 + 1], -aux1);
             atomicAdd(&a[j * 3 + 2], -aux2);
+            partial_PE[threadIdx.x] += rSqd6 - rSqd3;
+        }
 
-            atomicAdd(d_PE, rSqd6 - rSqd3);
+        // Redução atômica para d_PE
+        for (int stride = blockDim.x / 2; stride > 0; stride >>= 1) {
+            __syncthreads();
+            if (threadIdx.x < stride) {
+                partial_PE[threadIdx.x] += partial_PE[threadIdx.x + stride];
+            }
+        }
+
+        // O primeiro thread do bloco atualiza d_PE
+        if (threadIdx.x == 0) {
+            atomicAdd(d_PE, partial_PE[0] * 8);
         }
     }
-    //8 = var = 4 * 2 * epsilon
-
-    // atomicAdd(d_PE * 8, 0);
 }
+
 
 // double VelocityVerlet(double dt, int iter, FILE *fp,double * d_r,double * d_a,double * d_Pot)
 double VelocityVerlet(double dt, int iter, FILE *fp)
@@ -650,23 +694,34 @@ double VelocityVerlet(double dt, int iter, FILE *fp)
 
     // ******** CUDA INITS ********
     
-    checkCUDAError(cudaMemcpy(d_a, a, N * 3 * sizeof(double), cudaMemcpyHostToDevice));
+    // checkCUDAError(cudaMemcpy(d_a, a, N * 3 * sizeof(double), cudaMemcpyHostToDevice));
     checkCUDAError(cudaMemcpy(d_r, r, N * 3 * sizeof(double), cudaMemcpyHostToDevice));
-    checkCUDAError(cudaMemcpy(d_PE, &PE, sizeof(double), cudaMemcpyHostToDevice));
 
+    cudaMemset(d_PE, 0, sizeof(double));
 
-    int blockSize = 256;
+    // printf("1- PE: %f\n", PE);
+
+    int blockSize = BLOCK_SIZE;
     int gridSize = (N + blockSize - 1) / blockSize;
 
-    computeAccelerationsPotentialKernel<<<gridSize, blockSize>>>(N, d_r, d_a, d_PE);
+    cudaError_t cudaStatus;
+
+    // printf("==============================================\n");
+
+    computeAccelerationsPotential<<<gridSize, blockSize>>>(N, d_r, d_a, d_PE);
+
+    cudaStatus = cudaGetLastError();
+    if (cudaStatus != cudaSuccess) {
+        fprintf(stderr, "Erro no kernel: %s\n", cudaGetErrorString(cudaStatus));
+        // Trate o erro conforme necessário
+    }
 
     checkCUDAError(cudaDeviceSynchronize());
-
     checkCUDAError(cudaMemcpy(a, d_a, N * 3 * sizeof(double), cudaMemcpyDeviceToHost));
     checkCUDAError(cudaMemcpy(r, d_r, N * 3 * sizeof(double), cudaMemcpyDeviceToHost));
     checkCUDAError(cudaMemcpy(&PE, d_PE, sizeof(double), cudaMemcpyDeviceToHost));
-    PE *= 8;
 
+    // printf("==============================================\n");
 
     for (i = 0; i < N; i++)
     {
