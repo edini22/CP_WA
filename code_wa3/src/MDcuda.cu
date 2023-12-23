@@ -41,15 +41,6 @@
 
 cudaEvent_t start, stop;
 
-#define checkCUDAError(ans) \
-    { gpuAssert((ans), __FILE__, __LINE__); }
-inline void gpuAssert(cudaError_t code, const char* file, int line, bool abort = true) {
-    if (code != cudaSuccess) {
-        fprintf(stderr, "GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
-        if (abort) exit(code);
-    }
-}
-
 
 // Number of particles
 int N;
@@ -292,9 +283,9 @@ int main()
 
     // *********** CUDA ***********
     // Allocate memory on device
-    checkCUDAError(cudaMalloc((void**)&d_r, sizeof(double) * 3 * N));
-    checkCUDAError(cudaMalloc((void**)&d_a, sizeof(double) * 3 * N));
-    checkCUDAError(cudaMalloc((void**)&d_PE, sizeof(double)));
+    cudaMalloc((void**)&d_r, sizeof(double) * 3 * N);
+    cudaMalloc((void**)&d_a, sizeof(double) * 3 * N);
+    cudaMalloc((void**)&d_PE, sizeof(double));
 
 
     int tenp = floor(NumTime / 10);
@@ -387,9 +378,9 @@ int main()
 
     // ******** CUDA FREE ********
 
-    checkCUDAError(cudaFree(d_r));
-    checkCUDAError(cudaFree(d_a));
-    checkCUDAError(cudaFree(d_PE));
+    cudaFree(d_r);
+    cudaFree(d_a);
+    cudaFree(d_PE);
 
     return 0;
 }
@@ -589,19 +580,7 @@ __global__ void computeAccelerationsPotential(int N, double *r, double *a, doubl
     int j;
     double f, rSqd, temp0, temp1, temp2, ri0, ri1, ri2, aux0, aux1, aux2, rSqdInv, rSqd2, rSqd3, rSqd4, rSqd6, rSqd7;
 
-    __shared__ double partial_PE[BLOCK_SIZE];  // Tamanho do bloco, ajuste conforme necessário
-
-    // int threadId = threadIdx.x; // Índice da thread dentro do bloco
-    // int blockId = blockIdx.x;   // Índice do bloco no grid
-    // int blockD = blockDim.x;  // Número total de threads em um bloco
-    // int gridD = gridDim.x;    // Número total de blocos no grid
-
-    // int globalThreadId = threadIdx.x + blockIdx.x * blockDim.x;  // Índice global da thread
-
-    // // Imprime informações sobre as threads
-    // printf("Thread ID: %d, Block ID: %d, Block Dim: %d, Grid Dim: %d, Global Thread ID: %d\n",
-    //        threadId, blockId, blockD, gridD, globalThreadId);
-
+    __shared__ double partial_PE[BLOCK_SIZE]; 
 
     if (i < N) {
         // Inicializações
@@ -650,7 +629,6 @@ __global__ void computeAccelerationsPotential(int N, double *r, double *a, doubl
             partial_PE[threadIdx.x] += rSqd6 - rSqd3;
         }
 
-        // Redução atômica para d_PE
         for (int stride = blockDim.x / 2; stride > 0; stride >>= 1) {
             __syncthreads();
             if (threadIdx.x < stride) {
@@ -658,7 +636,6 @@ __global__ void computeAccelerationsPotential(int N, double *r, double *a, doubl
             }
         }
 
-        // O primeiro thread do bloco atualiza d_PE
         if (threadIdx.x == 0) {
             atomicAdd(d_PE, partial_PE[0] * 8);
         }
@@ -693,9 +670,7 @@ double VelocityVerlet(double dt, int iter, FILE *fp)
     }
 
     // ******** CUDA INITS ********
-    
-    // checkCUDAError(cudaMemcpy(d_a, a, N * 3 * sizeof(double), cudaMemcpyHostToDevice));
-    checkCUDAError(cudaMemcpy(d_r, r, N * 3 * sizeof(double), cudaMemcpyHostToDevice));
+    cudaMemcpy(d_r, r, N * 3 * sizeof(double), cudaMemcpyHostToDevice);
 
     cudaMemset(d_PE, 0, sizeof(double));
 
@@ -704,24 +679,13 @@ double VelocityVerlet(double dt, int iter, FILE *fp)
     int blockSize = BLOCK_SIZE;
     int gridSize = (N + blockSize - 1) / blockSize;
 
-    cudaError_t cudaStatus;
-
-    // printf("==============================================\n");
-
     computeAccelerationsPotential<<<gridSize, blockSize>>>(N, d_r, d_a, d_PE);
 
-    cudaStatus = cudaGetLastError();
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "Erro no kernel: %s\n", cudaGetErrorString(cudaStatus));
-        // Trate o erro conforme necessário
-    }
+    cudaDeviceSynchronize();
+    cudaMemcpy(a, d_a, N * 3 * sizeof(double), cudaMemcpyDeviceToHost);
+    cudaMemcpy(r, d_r, N * 3 * sizeof(double), cudaMemcpyDeviceToHost);
+    cudaMemcpy(&PE, d_PE, sizeof(double), cudaMemcpyDeviceToHost);
 
-    checkCUDAError(cudaDeviceSynchronize());
-    checkCUDAError(cudaMemcpy(a, d_a, N * 3 * sizeof(double), cudaMemcpyDeviceToHost));
-    checkCUDAError(cudaMemcpy(r, d_r, N * 3 * sizeof(double), cudaMemcpyDeviceToHost));
-    checkCUDAError(cudaMemcpy(&PE, d_PE, sizeof(double), cudaMemcpyDeviceToHost));
-
-    // printf("==============================================\n");
 
     for (i = 0; i < N; i++)
     {
