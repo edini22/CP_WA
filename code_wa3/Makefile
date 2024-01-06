@@ -6,8 +6,8 @@ LD  = nvcc
 
 CC = gcc
 
-# CXXFLAGS   = -O3 -g -std=c++11 -arch=sm_35 -Wno-deprecated-gpu-targets  
-CXXFLAGS   = -O3 -g -std=c++11 -arch=sm_70 -Wno-deprecated-gpu-targets  # local machine
+CXXFLAGS   = -O3 -g -std=c++11 -arch=sm_35 -Wno-deprecated-gpu-targets  
+# CXXFLAGS   = -O3 -g -std=c++11 -arch=sm_70 -Wno-deprecated-gpu-targets  # local machine
 
 SRC_DIR = src
 BIN_DIR = bin

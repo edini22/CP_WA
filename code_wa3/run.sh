@@ -3,4 +3,4 @@
 #SBATCH --partition=cpar
 #SBATCH --constraint=k20
 
-nvprof ./bin/MDcuda < inputdata.txt 
+time nvprof ./bin/MDcuda < inputdata.txt 
