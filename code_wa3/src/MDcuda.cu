@@ -35,12 +35,17 @@
 #include <sys/time.h>
 #include <chrono>
 
-#include <cuda_runtime.h>
+using namespace std;
 
-#define BLOCK_SIZE 32 //BASE 2
 
-cudaEvent_t start, stop;
+#define BLOCK_SIZE 16 //BASE 2
 
+void checkCUDAError (const char *msg) {
+	cudaError_t err = cudaGetLastError();
+	if( cudaSuccess != err) {
+		cerr << "Cuda error: " << msg << ", " << cudaGetErrorString( err) << endl;
+	}
+}
 
 // Number of particles
 int N;
@@ -529,57 +534,47 @@ __device__ double atomicAddDouble(double* address, double val) {
 
 __global__ void computeAccelerationsPotential(int N, double *r, double *a, double *d_PE) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
-    int j;
-    double f, rSqd, temp0, temp1, temp2, ri0, ri1, ri2, aux0, aux1, aux2, rSqdInv, rSqd2, rSqd3, rSqd4, rSqd6, rSqd7;
 
     __shared__ double partial_PE[BLOCK_SIZE];
 
     if (i < N) {
-        // Inicializações
-        a[i * 3] = 0.0;
-        a[i * 3 + 1] = 0.0;
-        a[i * 3 + 2] = 0.0;
-        partial_PE[threadIdx.x] = 0.0;
-        //__syncthreads();
-        
-        ri0 = r[i * 3];
-        ri1 = r[i * 3 + 1];
-        ri2 = r[i * 3 + 2];
+        int j;
+        double ak[3] = {0.0, 0.0, 0.0};
 
-        double tot0 = 0, tot1 = 0, tot2 = 0;
+        // Inicializações
+        partial_PE[threadIdx.x] = 0.0;
+        __syncthreads();
+        
+        double ri0 = r[i * 3];
+        double ri1 = r[i * 3 + 1];
+        double ri2 = r[i * 3 + 2];
         
         for (j = i + 1; j < N; j++) {
-            rSqd = 0;
 
-            temp0 = ri0 - r[j * 3];
-            rSqd += temp0 * temp0;
+            double temp0 = ri0 - r[j * 3];
 
-            temp1 = ri1 - r[j * 3 + 1];
-            rSqd += temp1 * temp1;
+            double temp1 = ri1 - r[j * 3 + 1];
 
-            temp2 = ri2 - r[j * 3 + 2];
-            rSqd += temp2 * temp2;
+            double temp2 = ri2 - r[j * 3 + 2];
 
-            rSqdInv = 1.0 / rSqd;
-            rSqd2 = rSqdInv * rSqdInv;
-            rSqd3 = rSqd2 * rSqdInv;
-            rSqd4 = rSqd2 * rSqd2;
-            rSqd6 = rSqd3 * rSqd3;
-            rSqd7 = rSqd6 * rSqdInv;
+            double rSqd = temp0 * temp0 + temp1 * temp1 + temp2 * temp2;
 
-            f = 24 * (2 * rSqd7 - rSqd4);
+            double rSqdInv = 1.0 / rSqd;
+            double rSqd2 = rSqdInv * rSqdInv;
+            double rSqd3 = rSqd2 * rSqdInv;
+            double rSqd4 = rSqd2 * rSqd2;
+            double rSqd6 = rSqd3 * rSqd3;
+            double rSqd7 = rSqd6 * rSqdInv;
 
-            aux0 = temp0 * f;
-            aux1 = temp1 * f;
-            aux2 = temp2 * f;
+            double f = 24 * (2 * rSqd7 - rSqd4);
 
-            tot0 += aux0;
-            tot1 += aux1;
-            tot2 += aux2;
+            double aux0 = temp0 * f;
+            double aux1 = temp1 * f;
+            double aux2 = temp2 * f;
 
-            // atomicAddDouble(&a[i * 3], aux0);
-            // atomicAddDouble(&a[i * 3 + 1], aux1);
-            // atomicAddDouble(&a[i * 3 + 2], aux2);
+            ak[0] += aux0;
+            ak[1] += aux1;
+            ak[2] += aux2;
 
             atomicAddDouble(&a[j * 3], -aux0);
             atomicAddDouble(&a[j * 3 + 1], -aux1);
@@ -587,12 +582,13 @@ __global__ void computeAccelerationsPotential(int N, double *r, double *a, doubl
             partial_PE[threadIdx.x] += rSqd6 - rSqd3;
         }
 
-        atomicAddDouble(&a[i * 3], tot0);
-        atomicAddDouble(&a[i * 3 + 1], tot1);
-        atomicAddDouble(&a[i * 3 + 2], tot2);
+        atomicAddDouble(&a[i * 3], ak[0]);
+        atomicAddDouble(&a[i * 3 + 1], ak[1]);
+        atomicAddDouble(&a[i * 3 + 2], ak[2]);
+
 
         for (int stride = blockDim.x / 2; stride > 0; stride >>= 1) {
-            //__syncthreads();
+            __syncthreads();
             if (threadIdx.x < stride) {
                 partial_PE[threadIdx.x] += partial_PE[threadIdx.x + stride];
             }
@@ -634,7 +630,7 @@ double VelocityVerlet(double dt, int iter, FILE *fp)
 
     // ******** CUDA INITS ********
     cudaMemcpy(d_r, r, N * 3 * sizeof(double), cudaMemcpyHostToDevice);
-
+    cudaMemset(d_a, 0, N * 3 * sizeof(double));
     cudaMemset(d_PE, 0, sizeof(double));
 
     // printf("1- PE: %f\n", PE);
@@ -643,10 +639,10 @@ double VelocityVerlet(double dt, int iter, FILE *fp)
     int gridSize = (N + blockSize - 1) / blockSize;
 
     computeAccelerationsPotential<<<gridSize, blockSize>>>(N, d_r, d_a, d_PE);
-
+    checkCUDAError("computeAccelerationsPotential");
     cudaDeviceSynchronize();
     cudaMemcpy(a, d_a, N * 3 * sizeof(double), cudaMemcpyDeviceToHost);
-    cudaMemcpy(r, d_r, N * 3 * sizeof(double), cudaMemcpyDeviceToHost);
+    // cudaMemcpy(r, d_r, N * 3 * sizeof(double), cudaMemcpyDeviceToHost);
     cudaMemcpy(&PE, d_PE, sizeof(double), cudaMemcpyDeviceToHost);
 
     
