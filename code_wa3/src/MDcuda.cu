@@ -535,16 +535,17 @@ __device__ double atomicAddDouble(double* address, double val) {
 __global__ void computeAccelerationsPotential(int N, double *r, double *a, double *d_PE) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
 
-    __shared__ double partial_PE[BLOCK_SIZE];
+    // __shared__ double partial_PE[BLOCK_SIZE];
 
     if (i < N) {
         int j;
         double ak[3] = {0.0, 0.0, 0.0};
+        double pot = 0.0;
 
         // Inicializações
-        partial_PE[threadIdx.x] = 0.0;
+        // partial_PE[threadIdx.x] = 0.0;
+
         __syncthreads();
-        
         double ri0 = r[i * 3];
         double ri1 = r[i * 3 + 1];
         double ri2 = r[i * 3 + 2];
@@ -579,24 +580,25 @@ __global__ void computeAccelerationsPotential(int N, double *r, double *a, doubl
             atomicAddDouble(&a[j * 3], -aux0);
             atomicAddDouble(&a[j * 3 + 1], -aux1);
             atomicAddDouble(&a[j * 3 + 2], -aux2);
-            partial_PE[threadIdx.x] += rSqd6 - rSqd3;
+            double temp = rSqd6 - rSqd3;
+            pot += temp;
         }
 
         atomicAddDouble(&a[i * 3], ak[0]);
         atomicAddDouble(&a[i * 3 + 1], ak[1]);
         atomicAddDouble(&a[i * 3 + 2], ak[2]);
 
-
-        for (int stride = blockDim.x / 2; stride > 0; stride >>= 1) {
-            __syncthreads();
-            if (threadIdx.x < stride) {
-                partial_PE[threadIdx.x] += partial_PE[threadIdx.x + stride];
-            }
-        }
-
-        if (threadIdx.x == 0) {
-            atomicAddDouble(d_PE, partial_PE[0] * 8);
-        }
+        atomicAddDouble(d_PE, pot * 8);
+        // for (int stride = blockDim.x / 2; stride > 0; stride >>= 1) {
+        //     __syncthreads();
+        //     if (threadIdx.x < stride) {
+        //         partial_PE[threadIdx.x] += partial_PE[threadIdx.x + stride];
+        //     }
+        // }
+        // __syncthreads();
+        // if (threadIdx.x == 0) {
+        //     atomicAddDouble(d_PE, partial_PE[0] * 8);
+        // }
     }
 }
 
@@ -636,7 +638,7 @@ double VelocityVerlet(double dt, int iter, FILE *fp)
     // printf("1- PE: %f\n", PE);
 
     int blockSize = BLOCK_SIZE;
-    int gridSize = (N + blockSize - 1) / blockSize;
+    int gridSize = (N + blockSize - 1) / blockSize + 1;
 
     computeAccelerationsPotential<<<gridSize, blockSize>>>(N, d_r, d_a, d_PE);
     checkCUDAError("computeAccelerationsPotential");
