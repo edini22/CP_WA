@@ -494,29 +494,19 @@ void computeAccelerationsPotential() {
         a[i][1] = 0.0;
         a[i][2] = 0.0;
     }
-
-    
     #pragma omp parallel
     {
-        // int num_threads = omp_get_num_threads();
-        // int id = omp_get_thread_num();
-
-        //printf("num_threads=%d id=%d\n", num_threads, id);
-
-        // Cada thread tem sua própria cópia privada da matriz 'a'
         double private_a[N][3];
         for (int i = 0; i < N; i++) {
             private_a[i][0] = 0.0;
             private_a[i][1] = 0.0;
             private_a[i][2] = 0.0;
         }
-
         #pragma omp for schedule(dynamic) reduction(+:Pot)
         for (int i = 0; i < N - 1; i++) {
             double ri0 = r[i][0];
             double ri1 = r[i][1];
             double ri2 = r[i][2];
-
             for (int j = i + 1; j < N; j++) {
                 double temp0 = ri0 - r[j][0];
                 double temp1 = ri1 - r[j][1];
@@ -529,25 +519,19 @@ void computeAccelerationsPotential() {
                 double rSqd4 = rSqd2 * rSqd2;
                 double rSqd6 = rSqd3 * rSqd3;
                 double rSqd7 = rSqd6 * rSqdInv;
-
                 double f = 24 * (2 * rSqd7 - rSqd4);
-
                 double aux0 = temp0 * f;
                 double aux1 = temp1 * f;
                 double aux2 = temp2 * f;
-
                 private_a[i][0] += aux0;
                 private_a[i][1] += aux1;
                 private_a[i][2] += aux2;
-
                 private_a[j][0] -= aux0;
                 private_a[j][1] -= aux1;
                 private_a[j][2] -= aux2;
-
                 Pot += rSqd6 - rSqd3;
             }
         }
-
         // Atualizar a matriz 'a' fora da região paralela
         #pragma omp critical
         {
@@ -558,7 +542,6 @@ void computeAccelerationsPotential() {
             }
         }
     }
-
     PE = Pot * var;
 }
 

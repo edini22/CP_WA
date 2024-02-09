@@ -477,13 +477,11 @@ double Kinetic()
 __device__ double atomicAddDouble(double* address, double val) {
     unsigned long long int* address_as_ull = (unsigned long long int*)address;
     unsigned long long int old = *address_as_ull, assumed;
-
     do {
         assumed = old;
         old = atomicCAS(address_as_ull, assumed,
                         __double_as_longlong(val + __longlong_as_double(assumed)));
     } while (assumed != old);
-
     return __longlong_as_double(old);
 }
 
@@ -539,55 +537,42 @@ __global__ void computeAccelerations(int N, double *r, double *a) {
 
 __global__ void computeAccelerationsPotential(int N, double *r, double *a, double *d_PE) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
-
     if (i < N) {
         int j;
         double ak[3] = {0.0, 0.0, 0.0};
         double pot = 0.0;
-
         // Inicializações
         double ri0 = r[i * 3];
         double ri1 = r[i * 3 + 1];
         double ri2 = r[i * 3 + 2];
         
         for (j = i + 1; j < N; j++) {
-
             double temp0 = ri0 - r[j * 3];
-
             double temp1 = ri1 - r[j * 3 + 1];
-
             double temp2 = ri2 - r[j * 3 + 2];
-
             double rSqd = temp0 * temp0 + temp1 * temp1 + temp2 * temp2;
-
             double rSqdInv = 1.0 / rSqd;
             double rSqd2 = rSqdInv * rSqdInv;
             double rSqd3 = rSqd2 * rSqdInv;
             double rSqd4 = rSqd2 * rSqd2;
             double rSqd6 = rSqd3 * rSqd3;
             double rSqd7 = rSqd6 * rSqdInv;
-
             double f = 24 * (2 * rSqd7 - rSqd4);
-
             double aux0 = temp0 * f;
             double aux1 = temp1 * f;
             double aux2 = temp2 * f;
-
             ak[0] += aux0;
             ak[1] += aux1;
             ak[2] += aux2;
-
             atomicAddDouble(&a[j * 3], -aux0);
             atomicAddDouble(&a[j * 3 + 1], -aux1);
             atomicAddDouble(&a[j * 3 + 2], -aux2);
             double temp = rSqd6 - rSqd3;
             pot += temp;
         }
-
         atomicAddDouble(&a[i * 3], ak[0]);
         atomicAddDouble(&a[i * 3 + 1], ak[1]);
         atomicAddDouble(&a[i * 3 + 2], ak[2]);
-
         atomicAddDouble(d_PE, pot * 8);
     }
 }
@@ -624,17 +609,12 @@ double VelocityVerlet(double dt, int iter, FILE *fp)
     cudaMemcpy(d_r, r, N * 3 * sizeof(double), cudaMemcpyHostToDevice);
     cudaMemset(d_a, 0, N * 3 * sizeof(double));
     cudaMemset(d_PE, 0, sizeof(double));
-
-    // printf("1- PE: %f\n", PE);
-
     int blockSize = BLOCK_SIZE;
     int gridSize = (N + blockSize - 1) / blockSize + 1;
-
     computeAccelerationsPotential<<<gridSize, blockSize>>>(N, d_r, d_a, d_PE);
     checkCUDAError("computeAccelerationsPotential");
     cudaDeviceSynchronize();
     cudaMemcpy(a, d_a, N * 3 * sizeof(double), cudaMemcpyDeviceToHost);
-    // cudaMemcpy(r, d_r, N * 3 * sizeof(double), cudaMemcpyDeviceToHost);
     cudaMemcpy(&PE, d_PE, sizeof(double), cudaMemcpyDeviceToHost);
 
     
